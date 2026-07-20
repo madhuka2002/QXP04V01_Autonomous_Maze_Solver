@@ -1,6 +1,8 @@
 from controller import Robot
 
 TIME_STEP = 64
+BASE_SPEED = 3.0
+CORRECTION = 0.8
 THRESHOLD = 80
 
 FORWARD_SPEED = 3.0
@@ -63,8 +65,8 @@ def stop():
 
 
 def move_forward(duration = 10):
-    left_motor.setVelocity(FORWARD_SPEED)
-    right_motor.setVelocity(FORWARD_SPEED)
+    left_motor.setVelocity(BASE_SPEED)
+    right_motor.setVelocity(BASE_SPEED)
 
     for _ in range(duration):
         robot.step(TIME_STEP)
@@ -102,6 +104,16 @@ def turn_around():
     stop()
 
 
+def steer_left():
+    left_motor.setVelocity(BASE_SPEED - CORRECTION)
+    right_motor.setVelocity(BASE_SPEED + CORRECTION)
+
+
+def steer_right():
+    left_motor.setVelocity(BASE_SPEED + CORRECTION)
+    right_motor.setVelocity(BASE_SPEED - CORRECTION)
+
+
 while robot.step(TIME_STEP) != -1:
 
     left = left_wall()
@@ -110,19 +122,24 @@ while robot.step(TIME_STEP) != -1:
 
     print(f"L:{left} F:{front} R:{right}")
 
-    if not front:
-        print("Forward")
-        move_forward()
+    # Wall directly ahead
+    if front:
 
-    else:
         if not left:
-            print("Turn Left")
             turn_left()
 
         elif not right:
-            print("Turn Right")
             turn_right()
 
         else:
-            print("Turn Around")
             turn_around()
+
+    # Corridor
+    else:
+
+        if left:
+            steer_right()      # Too close to left wall
+        elif right:
+            steer_left()       # Too close to right wall
+        else:
+            move_forward()
