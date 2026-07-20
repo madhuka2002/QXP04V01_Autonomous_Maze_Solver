@@ -4,6 +4,8 @@ TIME_STEP = 64
 BASE_SPEED = 3.0
 CORRECTION = 0.8
 THRESHOLD = 80
+SIDE_THRESHOLD = 100
+FRONT_THRESHOLD = 180
 
 FORWARD_SPEED = 3.0
 TURN_SPEED = 2.0
@@ -40,22 +42,22 @@ for name in sensor_names:
 
 def left_wall():
     return (
-        sensors[5].getValue() > THRESHOLD
-        or sensors[6].getValue() > THRESHOLD
+        sensors[5].getValue() > SIDE_THRESHOLD
+        or sensors[6].getValue() > SIDE_THRESHOLD
     )
 
 
 def front_wall():
     return (
-        sensors[0].getValue() > THRESHOLD
-        or sensors[7].getValue() > THRESHOLD
+        sensors[0].getValue() > FRONT_THRESHOLD
+        or sensors[7].getValue() > FRONT_THRESHOLD
     )
 
 
 def right_wall():
     return (
-        sensors[1].getValue() > THRESHOLD
-        or sensors[2].getValue() > THRESHOLD
+        sensors[1].getValue() > SIDE_THRESHOLD
+        or sensors[2].getValue() > SIDE_THRESHOLD
     )
 
 
@@ -120,7 +122,16 @@ while robot.step(TIME_STEP) != -1:
     front = front_wall()
     right = right_wall()
 
-    print(f"L:{left} F:{front} R:{right}")
+    #print(f"L:{left} F:{front} R:{right}")
+    #Calibrate
+    print(
+    f"ps0={sensors[0].getValue():.0f} "
+    f"ps1={sensors[1].getValue():.0f} "
+    f"ps2={sensors[2].getValue():.0f} "
+    f"ps5={sensors[5].getValue():.0f} "
+    f"ps6={sensors[6].getValue():.0f} "
+    f"ps7={sensors[7].getValue():.0f}"
+    )
 
     # Wall directly ahead
     if front:

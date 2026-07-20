@@ -1,0 +1,35 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/apartment_structure/protos/Wall.proto"
+
+WorldInfo {
+}
+Viewpoint {
+  orientation -0.579034060407002 0.5768667357236119 0.5761460978815743 2.099448351053462
+  position 0.023261855430783938 0.3683456287531565 4.196122004652144
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+RectangleArena {
+  floorSize 2.5 2.5
+  wallHeight 0.12
+}
+E-puck {
+  controller "maze_solver"
+}
+Wall {
+  translation 0.1 0 0
+  size 0.03 0.2 0.2
+}
+Wall {
+  translation 0 -0.2 0
+  rotation 0 0 1 -1.5707996938995747
+  name "wall(1)"
+  size 0.03 0.2 0.2
+}
