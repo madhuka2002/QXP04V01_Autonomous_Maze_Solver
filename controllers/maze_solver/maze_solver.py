@@ -12,11 +12,9 @@ TURN_SPEED = 2.0
 SIDE_THRESHOLD = 100
 FRONT_THRESHOLD = 180
 
-TURN_90_STEPS = 17.25
+TURN_90_STEPS = 17
 TURN_180_STEPS = 35
 
-# Move forward briefly after turning so the robot
-# clears the junction before checking sensors again.
 CLEAR_JUNCTION_STEPS = 10
 
 
@@ -55,12 +53,18 @@ sensors = []
 
 for name in sensor_names:
     sensor = robot.getDevice(name)
+
+    if sensor is None:
+        print(f"ERROR: Sensor '{name}' was not found.")
+        raise RuntimeError(f"Missing sensor: {name}")
+
     sensor.enable(TIME_STEP)
     sensors.append(sensor)
 
 
-# Allow sensors to initialize
-robot.step(TIME_STEP)
+# Allow proximity sensors to initialize
+if robot.step(TIME_STEP) == -1:
+    raise RuntimeError("Simulation ended during initialization.")
 
 
 # ==========================================================
@@ -130,7 +134,17 @@ STATE_CLEAR_JUNCTION = "CLEAR_JUNCTION"
 state = STATE_NAVIGATE
 steps_remaining = 0
 
+
+# ==========================================================
+# NAVIGATION STATISTICS
+# ==========================================================
+
 decision_count = 0
+left_turns = 0
+right_turns = 0
+turn_arounds = 0
+
+simulation_start_time = robot.getTime()
 
 
 # ==========================================================
@@ -140,7 +154,7 @@ decision_count = 0
 while robot.step(TIME_STEP) != -1:
 
     # ------------------------------------------------------
-    # Complete a left turn
+    # LEFT TURN STATE
     # ------------------------------------------------------
 
     if state == STATE_TURN_LEFT:
@@ -154,7 +168,7 @@ while robot.step(TIME_STEP) != -1:
         continue
 
     # ------------------------------------------------------
-    # Complete a right turn
+    # RIGHT TURN STATE
     # ------------------------------------------------------
 
     if state == STATE_TURN_RIGHT:
@@ -168,7 +182,7 @@ while robot.step(TIME_STEP) != -1:
         continue
 
     # ------------------------------------------------------
-    # Complete a 180-degree turn
+    # TURN AROUND STATE
     # ------------------------------------------------------
 
     if state == STATE_TURN_AROUND:
@@ -182,7 +196,7 @@ while robot.step(TIME_STEP) != -1:
         continue
 
     # ------------------------------------------------------
-    # Move away from the junction after turning
+    # CLEAR JUNCTION STATE
     # ------------------------------------------------------
 
     if state == STATE_CLEAR_JUNCTION:
@@ -194,57 +208,91 @@ while robot.step(TIME_STEP) != -1:
         continue
 
     # ------------------------------------------------------
-    # Read maze surroundings
+    # READ SURROUNDINGS
     # ------------------------------------------------------
 
     left = left_wall()
     front = front_wall()
     right = right_wall()
 
-    print(f"L:{left} F:{front} R:{right}")
+    print(
+        f"L:{left} "
+        f"F:{front} "
+        f"R:{right}"
+    )
 
     # ======================================================
     # LEFT-HAND RULE
     # ======================================================
 
-    # All directions are open.
-    # Continue forward instead of repeatedly turning left.
+    # Completely open area
     if not left and not front and not right:
         move_forward()
         print("Action: Forward through open area")
 
-    # A real left opening exists.
-    # The front is blocked or there is a right-side wall.
+    # Left opening available
     elif not left and (front or right):
         decision_count += 1
+        left_turns += 1
 
-        print(f"Decision #{decision_count}: Turn Left")
+        print(
+            f"Decision #{decision_count}: "
+            "Turn Left"
+        )
 
         start_left_turn()
         steps_remaining = TURN_90_STEPS
         state = STATE_TURN_LEFT
 
-    # Left blocked, but front is clear.
+    # Front path available
     elif not front:
         move_forward()
         print("Action: Forward")
 
-    # Left and front blocked, but right is open.
+    # Right opening available
     elif not right:
         decision_count += 1
+        right_turns += 1
 
-        print(f"Decision #{decision_count}: Turn Right")
+        print(
+            f"Decision #{decision_count}: "
+            "Turn Right"
+        )
 
         start_right_turn()
         steps_remaining = TURN_90_STEPS
         state = STATE_TURN_RIGHT
 
-    # Left, front and right are all blocked.
+    # Dead end
     else:
         decision_count += 1
+        turn_arounds += 1
 
-        print(f"Decision #{decision_count}: Dead End - Turn Around")
+        print(
+            f"Decision #{decision_count}: "
+            "Dead End - Turn Around"
+        )
 
         start_turn_around()
         steps_remaining = TURN_180_STEPS
         state = STATE_TURN_AROUND
+
+
+# ==========================================================
+# SIMULATION ENDED
+# ==========================================================
+
+stop()
+
+completion_time = robot.getTime() - simulation_start_time
+
+print()
+print("========================================")
+print("       QXP04 CONTROLLER STOPPED")
+print("========================================")
+print(f"Runtime         : {completion_time:.2f} seconds")
+print(f"Total decisions : {decision_count}")
+print(f"Left turns      : {left_turns}")
+print(f"Right turns     : {right_turns}")
+print(f"Turnarounds     : {turn_arounds}")
+print("========================================")
