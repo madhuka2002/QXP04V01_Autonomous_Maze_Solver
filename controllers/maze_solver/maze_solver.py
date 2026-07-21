@@ -1,14 +1,28 @@
 from controller import Robot
 
+# ==========================================================
+# CONFIGURATION
+# ==========================================================
+
 TIME_STEP = 64
-BASE_SPEED = 3.0
-CORRECTION = 0.8
-THRESHOLD = 80
-SIDE_THRESHOLD = 100
-FRONT_THRESHOLD = 180
 
 FORWARD_SPEED = 3.0
 TURN_SPEED = 2.0
+
+SIDE_THRESHOLD = 100
+FRONT_THRESHOLD = 180
+
+TURN_90_STEPS = 17.25
+TURN_180_STEPS = 35
+
+# Move forward briefly after turning so the robot
+# clears the junction before checking sensors again.
+CLEAR_JUNCTION_STEPS = 10
+
+
+# ==========================================================
+# ROBOT INITIALIZATION
+# ==========================================================
 
 robot = Robot()
 
@@ -20,6 +34,11 @@ right_motor.setPosition(float("inf"))
 
 left_motor.setVelocity(0.0)
 right_motor.setVelocity(0.0)
+
+
+# ==========================================================
+# SENSOR INITIALIZATION
+# ==========================================================
 
 sensor_names = [
     "ps0",
@@ -39,6 +58,14 @@ for name in sensor_names:
     sensor.enable(TIME_STEP)
     sensors.append(sensor)
 
+
+# Allow sensors to initialize
+robot.step(TIME_STEP)
+
+
+# ==========================================================
+# WALL DETECTION
+# ==========================================================
 
 def left_wall():
     return (
@@ -61,96 +88,163 @@ def right_wall():
     )
 
 
+# ==========================================================
+# MOTOR CONTROL
+# ==========================================================
+
 def stop():
     left_motor.setVelocity(0.0)
     right_motor.setVelocity(0.0)
 
 
-def move_forward(duration = 10):
-    left_motor.setVelocity(BASE_SPEED)
-    right_motor.setVelocity(BASE_SPEED)
-
-    for _ in range(duration):
-        robot.step(TIME_STEP)
-
-    stop()
+def move_forward():
+    left_motor.setVelocity(FORWARD_SPEED)
+    right_motor.setVelocity(FORWARD_SPEED)
 
 
-def turn_left():
+def start_left_turn():
     left_motor.setVelocity(-TURN_SPEED)
     right_motor.setVelocity(TURN_SPEED)
 
-    for _ in range(12):
-        robot.step(TIME_STEP)
 
-    stop()
-
-
-def turn_right():
+def start_right_turn():
     left_motor.setVelocity(TURN_SPEED)
     right_motor.setVelocity(-TURN_SPEED)
 
-    for _ in range(12):
-        robot.step(TIME_STEP)
 
-    stop()
-
-
-def turn_around():
+def start_turn_around():
     left_motor.setVelocity(TURN_SPEED)
     right_motor.setVelocity(-TURN_SPEED)
 
-    for _ in range(24):
-        robot.step(TIME_STEP)
 
-    stop()
+# ==========================================================
+# CONTROLLER STATES
+# ==========================================================
+
+STATE_NAVIGATE = "NAVIGATE"
+STATE_TURN_LEFT = "TURN_LEFT"
+STATE_TURN_RIGHT = "TURN_RIGHT"
+STATE_TURN_AROUND = "TURN_AROUND"
+STATE_CLEAR_JUNCTION = "CLEAR_JUNCTION"
+
+state = STATE_NAVIGATE
+steps_remaining = 0
+
+decision_count = 0
 
 
-def steer_left():
-    left_motor.setVelocity(BASE_SPEED - CORRECTION)
-    right_motor.setVelocity(BASE_SPEED + CORRECTION)
-
-
-def steer_right():
-    left_motor.setVelocity(BASE_SPEED + CORRECTION)
-    right_motor.setVelocity(BASE_SPEED - CORRECTION)
-
+# ==========================================================
+# MAIN CONTROLLER LOOP
+# ==========================================================
 
 while robot.step(TIME_STEP) != -1:
+
+    # ------------------------------------------------------
+    # Complete a left turn
+    # ------------------------------------------------------
+
+    if state == STATE_TURN_LEFT:
+        steps_remaining -= 1
+
+        if steps_remaining <= 0:
+            move_forward()
+            steps_remaining = CLEAR_JUNCTION_STEPS
+            state = STATE_CLEAR_JUNCTION
+
+        continue
+
+    # ------------------------------------------------------
+    # Complete a right turn
+    # ------------------------------------------------------
+
+    if state == STATE_TURN_RIGHT:
+        steps_remaining -= 1
+
+        if steps_remaining <= 0:
+            move_forward()
+            steps_remaining = CLEAR_JUNCTION_STEPS
+            state = STATE_CLEAR_JUNCTION
+
+        continue
+
+    # ------------------------------------------------------
+    # Complete a 180-degree turn
+    # ------------------------------------------------------
+
+    if state == STATE_TURN_AROUND:
+        steps_remaining -= 1
+
+        if steps_remaining <= 0:
+            move_forward()
+            steps_remaining = CLEAR_JUNCTION_STEPS
+            state = STATE_CLEAR_JUNCTION
+
+        continue
+
+    # ------------------------------------------------------
+    # Move away from the junction after turning
+    # ------------------------------------------------------
+
+    if state == STATE_CLEAR_JUNCTION:
+        steps_remaining -= 1
+
+        if steps_remaining <= 0:
+            state = STATE_NAVIGATE
+
+        continue
+
+    # ------------------------------------------------------
+    # Read maze surroundings
+    # ------------------------------------------------------
 
     left = left_wall()
     front = front_wall()
     right = right_wall()
 
-    #print(f"L:{left} F:{front} R:{right}")
-    #Calibrate
-    print(
-    f"ps0={sensors[0].getValue():.0f} "
-    f"ps1={sensors[1].getValue():.0f} "
-    f"ps2={sensors[2].getValue():.0f} "
-    f"ps5={sensors[5].getValue():.0f} "
-    f"ps6={sensors[6].getValue():.0f} "
-    f"ps7={sensors[7].getValue():.0f}"
-    )
+    print(f"L:{left} F:{front} R:{right}")
 
-    # Wall directly ahead
-    if front:
+    # ======================================================
+    # LEFT-HAND RULE
+    # ======================================================
 
-        if not left:
-            turn_left()
+    # All directions are open.
+    # Continue forward instead of repeatedly turning left.
+    if not left and not front and not right:
+        move_forward()
+        print("Action: Forward through open area")
 
-        elif not right:
-            turn_right()
+    # A real left opening exists.
+    # The front is blocked or there is a right-side wall.
+    elif not left and (front or right):
+        decision_count += 1
 
-        else:
-            turn_around()
+        print(f"Decision #{decision_count}: Turn Left")
 
-    # Corridor
+        start_left_turn()
+        steps_remaining = TURN_90_STEPS
+        state = STATE_TURN_LEFT
+
+    # Left blocked, but front is clear.
+    elif not front:
+        move_forward()
+        print("Action: Forward")
+
+    # Left and front blocked, but right is open.
+    elif not right:
+        decision_count += 1
+
+        print(f"Decision #{decision_count}: Turn Right")
+
+        start_right_turn()
+        steps_remaining = TURN_90_STEPS
+        state = STATE_TURN_RIGHT
+
+    # Left, front and right are all blocked.
     else:
+        decision_count += 1
 
-        if left:
-            steer_right()      # Too close to left wall
-        elif right:
-            steer_left()       # Too close to right wall
-        else:
-            move_forward()
+        print(f"Decision #{decision_count}: Dead End - Turn Around")
+
+        start_turn_around()
+        steps_remaining = TURN_180_STEPS
+        state = STATE_TURN_AROUND
