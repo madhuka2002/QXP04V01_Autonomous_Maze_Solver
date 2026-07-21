@@ -9,8 +9,8 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 WorldInfo {
 }
 Viewpoint {
-  orientation -0.579034060407002 0.5768667357236119 0.5761460978815743 2.099448351053462
-  position 0.023261855430783938 0.3683456287531565 4.196122004652144
+  orientation -0.5751802240922277 0.5845453185885393 0.5722538600389149 2.087906079800454
+  position -0.3988489293413044 0.2757683331269522 6.990420652894206
 }
 TexturedBackground {
 }
@@ -21,15 +21,65 @@ RectangleArena {
   wallHeight 0.12
 }
 E-puck {
+  translation 0.1 -1.15 -6.39617e-05
   controller "maze_solver"
 }
 Wall {
-  translation 0.1 0 0
+  translation -1 0.6 0
+  size 0.03 0.6 0.2
+}
+Wall {
+  translation -0.3 -0.1 0
+  name "wall(5)"
   size 0.03 0.2 0.2
+}
+Wall {
+  translation 1 0.4 0
+  name "wall(9)"
+  size 0.03 0.2 0.2
+}
+Wall {
+  translation -1 -0.6 0
+  name "wall(4)"
+  size 0.03 0.7 0.2
+}
+Wall {
+  translation 0.5 -1.1 0
+  name "wall(3)"
+  size 0.03 0.3 0.2
 }
 Wall {
   translation 0 -0.2 0
   rotation 0 0 1 -1.5707996938995747
   name "wall(1)"
-  size 0.03 0.2 0.2
+  size 0.03 2 0.2
+}
+Wall {
+  rotation 0 0 1 -1.5707996938995747
+  name "wall(6)"
+  size 0.03 2 0.2
+}
+Wall {
+  translation 0 0.3 0
+  rotation 0 0 1 -1.5707996938995747
+  name "wall(7)"
+  size 0.03 2 0.2
+}
+Wall {
+  translation -0.2 -1 0
+  rotation 0 0 1 -1.5707996938995747
+  name "wall(2)"
+  size 0.02 1.5 0.2
+}
+Wall {
+  translation -0.5 0.9 0
+  rotation 0 0 1 -1.5707996938995747
+  name "wall(8)"
+  size 0.02 1.5 0.2
+}
+Wall {
+  translation 1.1 -0.2 0
+  rotation 0 0 1 -1.5707996938995747
+  name "wall(10)"
+  size 0.02 0.2 0.2
 }
