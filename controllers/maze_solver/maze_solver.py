@@ -12,10 +12,15 @@ TURN_SPEED = 2.0
 SIDE_THRESHOLD = 100
 FRONT_THRESHOLD = 180
 
-TURN_90_STEPS = 17.25
-TURN_180_STEPS = 34.5
+TURN_90_STEPS = 17
+TURN_180_STEPS = 35
 
 CLEAR_JUNCTION_STEPS = 10
+
+# Number of consecutive readings required before confirming
+# an opening or obstacle.
+JUNCTION_CONFIRM_STEPS = 3
+FRONT_CONFIRM_STEPS = 2
 
 
 # ==========================================================
@@ -26,6 +31,9 @@ robot = Robot()
 
 left_motor = robot.getDevice("left wheel motor")
 right_motor = robot.getDevice("right wheel motor")
+
+if left_motor is None or right_motor is None:
+    raise RuntimeError("Wheel motors were not found.")
 
 left_motor.setPosition(float("inf"))
 right_motor.setPosition(float("inf"))
@@ -55,14 +63,13 @@ for name in sensor_names:
     sensor = robot.getDevice(name)
 
     if sensor is None:
-        print(f"ERROR: Sensor '{name}' was not found.")
-        raise RuntimeError(f"Missing sensor: {name}")
+        raise RuntimeError(f"Sensor '{name}' was not found.")
 
     sensor.enable(TIME_STEP)
     sensors.append(sensor)
 
 
-# Allow proximity sensors to initialize
+# Allow sensors to initialize.
 if robot.step(TIME_STEP) == -1:
     raise RuntimeError("Simulation ended during initialization.")
 
@@ -136,6 +143,25 @@ steps_remaining = 0
 
 
 # ==========================================================
+# SENSOR CONFIRMATION COUNTERS
+# ==========================================================
+
+left_open_counter = 0
+right_open_counter = 0
+front_blocked_counter = 0
+
+
+def reset_detection_counters():
+    global left_open_counter
+    global right_open_counter
+    global front_blocked_counter
+
+    left_open_counter = 0
+    right_open_counter = 0
+    front_blocked_counter = 0
+
+
+# ==========================================================
 # NAVIGATION STATISTICS
 # ==========================================================
 
@@ -154,7 +180,7 @@ simulation_start_time = robot.getTime()
 while robot.step(TIME_STEP) != -1:
 
     # ------------------------------------------------------
-    # LEFT TURN STATE
+    # COMPLETE LEFT TURN
     # ------------------------------------------------------
 
     if state == STATE_TURN_LEFT:
@@ -168,7 +194,7 @@ while robot.step(TIME_STEP) != -1:
         continue
 
     # ------------------------------------------------------
-    # RIGHT TURN STATE
+    # COMPLETE RIGHT TURN
     # ------------------------------------------------------
 
     if state == STATE_TURN_RIGHT:
@@ -182,7 +208,7 @@ while robot.step(TIME_STEP) != -1:
         continue
 
     # ------------------------------------------------------
-    # TURN AROUND STATE
+    # COMPLETE TURNAROUND
     # ------------------------------------------------------
 
     if state == STATE_TURN_AROUND:
@@ -196,13 +222,14 @@ while robot.step(TIME_STEP) != -1:
         continue
 
     # ------------------------------------------------------
-    # CLEAR JUNCTION STATE
+    # CLEAR CURRENT JUNCTION
     # ------------------------------------------------------
 
     if state == STATE_CLEAR_JUNCTION:
         steps_remaining -= 1
 
         if steps_remaining <= 0:
+            reset_detection_counters()
             state = STATE_NAVIGATE
 
         continue
@@ -216,66 +243,113 @@ while robot.step(TIME_STEP) != -1:
     right = right_wall()
 
     print(
+        f"Walls | "
         f"L:{left} "
         f"F:{front} "
         f"R:{right}"
+    )
+
+    # ------------------------------------------------------
+    # UPDATE SENSOR CONFIRMATION COUNTERS
+    # ------------------------------------------------------
+
+    if not left:
+        left_open_counter += 1
+    else:
+        left_open_counter = 0
+
+    if not right:
+        right_open_counter += 1
+    else:
+        right_open_counter = 0
+
+    if front:
+        front_blocked_counter += 1
+    else:
+        front_blocked_counter = 0
+
+    left_open_confirmed = (
+        left_open_counter >= JUNCTION_CONFIRM_STEPS
+    )
+
+    right_open_confirmed = (
+        right_open_counter >= JUNCTION_CONFIRM_STEPS
+    )
+
+    front_blocked_confirmed = (
+        front_blocked_counter >= FRONT_CONFIRM_STEPS
     )
 
     # ======================================================
     # LEFT-HAND RULE
     # ======================================================
 
-    # Completely open area
-    if not left and not front and not right:
-        move_forward()
-        print("Action: Forward through open area")
-
-    # Left opening available
-    elif not left and (front or right):
+    # Confirmed left opening at a corner or junction.
+    if left_open_confirmed and (front or right):
         decision_count += 1
         left_turns += 1
 
         print(
             f"Decision #{decision_count}: "
-            "Turn Left"
+            "Confirmed Left Turn"
         )
+
+        reset_detection_counters()
 
         start_left_turn()
         steps_remaining = TURN_90_STEPS
         state = STATE_TURN_LEFT
 
-    # Front path available
+    # Front is open, so continue moving forward.
     elif not front:
         move_forward()
         print("Action: Forward")
 
-    # Right opening available
-    elif not right:
+    # Front is blocked and right side is confirmed open.
+    elif front_blocked_confirmed and right_open_confirmed:
         decision_count += 1
         right_turns += 1
 
         print(
             f"Decision #{decision_count}: "
-            "Turn Right"
+            "Confirmed Right Turn"
         )
+
+        reset_detection_counters()
 
         start_right_turn()
         steps_remaining = TURN_90_STEPS
         state = STATE_TURN_RIGHT
 
-    # Dead end
-    else:
+    # Front, left and right are blocked.
+    elif (
+        front_blocked_confirmed
+        and left
+        and right
+    ):
         decision_count += 1
         turn_arounds += 1
 
         print(
             f"Decision #{decision_count}: "
-            "Dead End - Turn Around"
+            "Confirmed Dead End - Turn Around"
         )
+
+        reset_detection_counters()
 
         start_turn_around()
         steps_remaining = TURN_180_STEPS
         state = STATE_TURN_AROUND
+
+    # Wait for enough stable readings.
+    else:
+        move_forward()
+        print(
+            "Action: Waiting for stable decision "
+            f"| LeftCounter:{left_open_counter} "
+            f"RightCounter:{right_open_counter} "
+            f"FrontCounter:{front_blocked_counter}"
+        )
 
 
 # ==========================================================
